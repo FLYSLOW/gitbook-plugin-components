@@ -1,4 +1,5 @@
 var fs = require('fs');
+var path = require('path');
 var cheerio = require('cheerio');
 var url = require('url');
 
@@ -10,13 +11,16 @@ module.exports = {
     "page": function (page) {
       if (this.output.name != 'website') return page;
 
-      var lang = this.isLanguageBook() ? this.config.values.language : '';
-      if (lang) lang = lang + '/';
+      var lang = this.config.get('language', '');
+      var outputDir = this.config.get('output');
+      var outputUrl = this.output.toURL(path.resolve(outputDir, lang, page.path));
 
-      var outputUrl = this.output.toURL('_book/' + lang + page.path);
+      if (page.path === 'README.md') {
+        outputUrl = path.join(outputUrl, 'index.html');
+      }
 
       urls.push({
-        url: outputUrl + (outputUrl.substr(-5, 5) !== '.html' ? 'index.html' : '')
+        url: outputUrl
       });
 
       return page;
@@ -26,19 +30,16 @@ module.exports = {
       var $, $el, html;
       var templatePath = this.config.get('pluginsConfig.components.templatePath');
       var templates = this.config.get('pluginsConfig.components.templates');
-      if (typeof templatePath === 'undefined') templatePath = 'docs/components';
+      templatePath = templatePath || 'docs/components';
 
       urls.forEach(item => {
         html = fs.readFileSync(item.url, {encoding: 'utf-8'});
         $ = cheerio.load(html);
 
-        $('body').find('.gitbookPluginComponent').remove()
-
         templates.forEach(template => {
-          var singleTemplatePath = templatePath + '/' + template.name + '.html';
+          var singleTemplatePath = this.resolve(templatePath + '/' + template.name + '.html');
           if (singleTemplatePath && fs.existsSync(singleTemplatePath)) {
             var templateHTML = (fs.readFileSync(singleTemplatePath, {encoding: 'utf-8'}));
-            templateHTML = '<div class="gitbookPluginComponent">' + templateHTML + '</div>';
             $el = $(template.target);
             if (template.prepend !== "false") {
               $el.prepend(templateHTML);
